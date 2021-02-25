@@ -76,7 +76,6 @@ public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
             DenoiSegOutput<?, ?> output = singleImagePrediction(prediction, data.get(im).getA());
             final RandomAccessibleInterval<FloatType> seg = (RandomAccessibleInterval<FloatType>) Views.hyperSlice(output.getSegmented(), 2, 1);
 
-
             for (int t = 0; t < 9; t++) {
                 // threshold foreground prediction to get a mask
                 final double threshold = 0.1+0.1*t;
@@ -163,7 +162,7 @@ public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
                 pairingMatrix[gtLabels.indexOf(gtLabel) + numGtLabels * predLabels.indexOf(predLabel)] += 1;
         }
 
-        // for every gt label, find the overlap > 50%
+        // for every gt label, find the pred label with maximum overlap
         double num_labels = 0.;
         for (int i=0; i < numGtLabels; i++) {
             int matchingLabel = -1;
@@ -175,11 +174,7 @@ public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
                     max_overlap = overlap;
                     matchingLabel = j;
                 }
-                /*overlap /= (double) gtHist.get( gtLabels.get(i) );
-                if (overlap > 0.5){
-                    matchingLabel = j;
-                    break;
-                }*/
+                // NB: other approaches calculate % overlap and only select > 0.5
             }
 
             if (matchingLabel >= 0) {
@@ -216,8 +211,8 @@ public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
         new ImageJ();
 
         // Load the image to segment.
-        String gtF = "/Users/deschamp/Downloads/denoiseg_mouse/Y_val/img_5.tif";
-        String predF = "/Users/deschamp/Downloads/denoiseg_mouse/Y_val_pred/pred_5.tif";
+        String gtF = "denoiseg_mouse/Y_val/img_5.tif";
+        String predF = "denoiseg_mouse/Y_val_pred/pred_5.tif";
         final ImagePlus gtIp = IJ.openImage( gtF);
         final ImagePlus predIp = IJ.openImage( predF);
 

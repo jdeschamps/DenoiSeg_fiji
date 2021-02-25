@@ -1,7 +1,6 @@
 package de.csbdresden.denoiseg.command;
 
 import de.csbdresden.denoiseg.predict.ThresholdOptimizer;
-import net.imagej.Dataset;
 import net.imagej.ImageJ;
 import net.imagej.modelzoo.ModelZooArchive;
 import net.imagej.modelzoo.ModelZooService;
@@ -18,7 +17,6 @@ import net.imglib2.util.Pair;
 import net.imglib2.view.Views;
 import org.scijava.Cancelable;
 import org.scijava.Context;
-import org.scijava.ItemIO;
 import org.scijava.command.Command;
 import org.scijava.io.IOService;
 import org.scijava.plugin.Parameter;
@@ -31,15 +29,14 @@ import org.scijava.ui.UIService;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import static org.scijava.widget.FileWidget.DIRECTORY_STYLE;
 
-@Plugin( type = Command.class, menuPath = "Plugins>CSBDeep>DenoiSeg>Get optimized threshold" )
-public class GetOptimizedThresholdCommand implements Command, Cancelable {
+@Plugin( type = Command.class, menuPath = "Plugins>CSBDeep>DenoiSeg>DenoiSeg optimize threshold" )
+public class DenoiSegOptimizeThresholdCommand implements Command, Cancelable {
 
     @Parameter(
             label = "Trained model file (.zip)"
@@ -197,11 +194,11 @@ public class GetOptimizedThresholdCommand implements Command, Cancelable {
         final ImageJ imageJ = new ImageJ();
         imageJ.ui().showUI();
 
-        File valX = new File("/Users/deschamp/Downloads/denoiseg_mouse/X_val");
-        File valY = new File("/Users/deschamp/Downloads/denoiseg_mouse/Y_val");
-        File model = new File("/Users/deschamp/Downloads/denoiseg_mouse/denoiseg-5359585749979253915.bioimage.io.zip");
+        File valX = new File("denoiseg_mouse/X_val");
+        File valY = new File("denoiseg_mouse/Y_val");
+        File model = new File("/denoiseg_mouse/denoiseg-5359585749979253915.bioimage.io.zip");
 
-        imageJ.command().run( GetOptimizedThresholdCommand.class, true,
+        imageJ.command().run( DenoiSegOptimizeThresholdCommand.class, true,
                 "modelFile", model,
                 "validationRawData", valX,
                 "validationLabelingData", valY).get();
