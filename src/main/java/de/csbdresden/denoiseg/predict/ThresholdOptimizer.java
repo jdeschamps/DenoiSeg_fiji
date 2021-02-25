@@ -1,10 +1,16 @@
 package de.csbdresden.denoiseg.predict;
 
 
+import ij.IJ;
+import ij.ImageJ;
+import ij.ImagePlus;
 import net.imagej.DatasetService;
 import net.imagej.modelzoo.ModelZooArchive;
 import net.imagej.modelzoo.consumer.ModelZooPredictionOptions;
+import net.imagej.modelzoo.consumer.converter.RealIntConverter;
 import net.imagej.modelzoo.consumer.model.prediction.ImageInput;
+import net.imglib2.Cursor;
+import net.imglib2.RandomAccess;
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.algorithm.labeling.ConnectedComponents;
 import net.imglib2.converter.Converters;
@@ -21,10 +27,10 @@ import net.imglib2.util.Intervals;
 import net.imglib2.util.Pair;
 import net.imglib2.view.Views;
 import org.scijava.Context;
+import org.scijava.log.LogService;
 import org.scijava.plugin.Parameter;
 
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 
 public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
 
@@ -34,8 +40,10 @@ public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
     @Parameter
     private DatasetService datasetService;
 
-    private ModelZooArchive archive;
+    @Parameter
+    private LogService logService;
 
+    private ModelZooArchive archive;
 
     private List<Pair<RandomAccessibleInterval<T>, RandomAccessibleInterval<IntType>>> data;
 
@@ -46,7 +54,8 @@ public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
         this.data = data;
     }
 
-    public void run() throws Exception {
+    public double run() throws Exception {
+        logService.log(0, "Starting threshold optimization");
 
         // create prediction
         DenoiSegPrediction prediction;
@@ -60,70 +69,145 @@ public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
         prediction.setOptions(this.createOptions());
 
         int n = data.size();
-        for(double th=0.1; th<=1.; th+=0.1) {
+        Map<Double, Double> scores = new HashMap<Double, Double>();
+        for (int im=0; im<n; im++) {
+            for (double th = 0.1; th <= 1.; th += 0.1) {
+                // GT
+                final RandomAccessibleInterval<IntType> gt = data.get(im).getB();
 
-            double average_score = 0;
+                // prediction
+                DenoiSegOutput<?, ?> output = singleImagePrediction(prediction, data.get(im).getA());
+                final RandomAccessibleInterval<FloatType> seg = (RandomAccessibleInterval<FloatType>) Views.hyperSlice(output.getSegmented(), 2, 1);
 
-            DenoiSegOutput<?, ?> output = singleImagePrediction(prediction, data.get(0).getA());
-            final RandomAccessibleInterval<FloatType> seg = (RandomAccessibleInterval<FloatType>) Views.hyperSlice(output.getSegmented(), 2,1);
+                // threshold foreground prediction to get a mask
+                final double threshold = th;
+                final RandomAccessibleInterval<BoolType> mask = Converters.convert(
+                        seg, (i, o) -> o.set(i.get() > threshold), new BoolType());
 
-            final double threshold = th;
-            final RandomAccessibleInterval< BoolType > mask = Converters.convert(
-                    seg, ( i, o ) -> o.set( i.get() > threshold ), new BoolType() );
+                // create a String labeling
+                final Img<IntType> labelImg = ArrayImgs.ints(Intervals.dimensionsAsLongArray(seg));
+                final ImgLabeling<String, IntType> labeling = new ImgLabeling<>(labelImg);
 
-            // Create a String labeling
-            final Img< IntType > labelImg = ArrayImgs.ints( Intervals.dimensionsAsLongArray( seg ) );
-            final ImgLabeling< String, IntType > labeling = new ImgLabeling<>( labelImg );
+                // label connected components
+                final ConnectedComponents.StructuringElement se = ConnectedComponents.StructuringElement.FOUR_CONNECTED;
+                final Iterator<String> labelCreator = new Iterator<String>() {
+                    int id = 0;
 
-            // Label connected components
-            final ConnectedComponents.StructuringElement se = ConnectedComponents.StructuringElement.FOUR_CONNECTED;
-            final Iterator< String > labelCreator = new Iterator< String >()
-            {
-                int id = 0;
+                    @Override
+                    public boolean hasNext() {
+                        return true;
+                    }
 
-                @Override
-                public boolean hasNext()
-                {
-                    return true;
+                    @Override
+                    public synchronized String next() {
+                        return "l" + (id++);
+                    }
+                };
+                ConnectedComponents.labelAllConnectedComponents(mask, labeling, labelCreator, se);
+
+                // get score
+                double score = getPrecision(gt, labelImg);
+                logService.log(0, "Image "+im+", Threshold "+th+" -> "+score);
+
+                if(scores.containsKey(th)){
+                    scores.put(th, scores.get(th)+score/ (double) n);
+                } else {
+                    scores.put(th, score/ (double) n);
                 }
-
-                @Override
-                public synchronized String next()
-                {
-                    return "l" + ( id++ );
-                }
-            };
-            ConnectedComponents.labelAllConnectedComponents( mask, labeling, labelCreator, se );
-
-            ImageJFunctions.show( labelImg, "labelImg" );
-
-            
-
-            /*for (int i = 0; i < n; i++) {
-                DenoiSegOutput<?, ?> output = singleImagePrediction(prediction, data.get(i).getA());
-                RandomAccessibleInterval<?> segmented = output.getSegmented();
-
-                average_score += getPrecision(segmented, data.get(i).getB())/n;
-            }*/
+            }
         }
 
-        // use converter to booltype
-        // connected components
+        double max_score = -1;
+        double threshold = -1;
+        for(Double t: scores.keySet()){
+            logService.log(0, "Threshold "+t+" -> "+scores.get(t));
 
-        // for each threshold 0.1 to 0.9
-            // for each image
-                // load image
-                // predict
-                // compute mask
-                // get score comparing to GT
-                // save threshold and score
-        // return best score
+            if(scores.get(t) > max_score){
+                max_score = scores.get(t);
+                threshold = t;
+            }
+        }
+        logService.log(0, "Max threshold "+threshold+" -> "+max_score);
+
+        return threshold;
     }
 
-    private double getPrecision(RandomAccessibleInterval<?> pred, RandomAccessibleInterval<IntType> gt){
+    // Code adapted from https://github.com/CellTrackingChallenge
+    static protected double getPrecision(RandomAccessibleInterval<IntType> gt, RandomAccessibleInterval<IntType> prediction){
+        double precision = 0.;
 
-        return 0.;
+        // histograms pixels / label
+        LinkedHashMap<Integer,Integer> gtHist = new LinkedHashMap<Integer,Integer>();
+        LinkedHashMap<Integer,Integer> predHist = new LinkedHashMap<Integer,Integer>();
+
+        Cursor<IntType> c = Views.iterable(gt).localizingCursor();
+        RandomAccess<IntType> c2 = prediction.randomAccess();
+        while(c.hasNext()){
+            // update gt histogram
+            Integer label = c.next().getInteger();
+            Integer count = gtHist.get(label);
+            gtHist.put(label, count == null ? 1 : count+1);
+
+            // update prediction histogram
+            c2.setPosition(c);
+            label = c2.get().getInteger();
+            count = predHist.get(label);
+            predHist.put(label, count == null ? 1 : count+1);
+        }
+
+        // label pairing matrix
+        final int numGtLabels = gtHist.size();
+        final int numPredLabels = predHist.size();
+        final int[] pairingMatrix = new int[numGtLabels * numPredLabels];
+        final ArrayList<Integer> gtLabels = new ArrayList<Integer>(gtHist.keySet());
+        final ArrayList<Integer> predLabels = new ArrayList<Integer>(predHist.keySet());
+
+        // calculate intersection
+        c.reset();
+        while (c.hasNext()) {
+            c.next();
+            c2.setPosition(c);
+
+            int gtLabel  = c.get().get();
+            int predLabel = c2.get().get();
+
+            // if the pixel belongs to an instance in both cases
+            if (gtLabel > 0 && predLabel > 0)
+                pairingMatrix[gtLabels.indexOf(gtLabel) + numGtLabels * predLabels.indexOf(predLabel)] += 1;
+        }
+
+        // for every gt label, find the overlap > 50%
+        double num_labels = 0.;
+        for (int i=0; i < numGtLabels; i++) {
+            int matchingLabel = -1;
+            double max_overlap = -1;
+            for (int j=0; j < numPredLabels; j++){
+
+                double overlap = (double) pairingMatrix[i + numGtLabels * j];
+                if(overlap > max_overlap){
+                    max_overlap = overlap;
+                    matchingLabel = j;
+                }
+                /*overlap /= (double) gtHist.get( gtLabels.get(i) );
+                if (overlap > 0.5){
+                    matchingLabel = j;
+                    break;
+                }*/
+            }
+
+            if (matchingLabel >= 0) {
+                num_labels += 1;
+                double intersection = (double) pairingMatrix[i + numGtLabels * matchingLabel];
+                double n_gt = gtHist.get(gtLabels.get(i));
+                double n_pred = predHist.get(predLabels.get(matchingLabel));
+
+                precision += intersection / (double) (n_gt + n_pred - intersection);
+            }
+        }
+
+        return num_labels == 0 ? 0 : precision / (double) num_labels;
     }
+
 
     public DenoiSegOutput<?, ?> singleImagePrediction(DenoiSegPrediction prediction, RandomAccessibleInterval<T> image) throws Exception {
         prediction.setInput(new ImageInput("input", image, "XY"));
@@ -136,4 +220,25 @@ public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
         return ModelZooPredictionOptions.options().numberOfTiles(1).batchSize(10).showProgressDialog(false).convertIntoInputFormat(false);
     }
 
+    // delete from here, only used for the main
+    private static <T extends RealType<T>> RandomAccessibleInterval<IntType> convertToInt(RandomAccessibleInterval<T> img) {
+        return Converters.convert(img, new RealIntConverter<T>(), new IntType());
+    }
+
+    public static void main( final String... args ){
+        new ImageJ();
+
+        // Load the image to segment.
+        String gtF = "/Users/deschamp/Downloads/denoiseg_mouse/Y_val/img_5.tif";
+        String predF = "/Users/deschamp/Downloads/denoiseg_mouse/Y_val_pred/pred_5.tif";
+        final ImagePlus gtIp = IJ.openImage( gtF);
+        final ImagePlus predIp = IJ.openImage( predF);
+
+        final RandomAccessibleInterval<FloatType> img = ImageJFunctions.wrap( gtIp );
+        RandomAccessibleInterval<IntType> gt = convertToInt(img);
+        final RandomAccessibleInterval<FloatType> img2 = ImageJFunctions.wrap( predIp );
+        RandomAccessibleInterval<IntType> pred = convertToInt(img2);
+
+        System.out.println(getPrecision(gt, pred));
+    }
 }

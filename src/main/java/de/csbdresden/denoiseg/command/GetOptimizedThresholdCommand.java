@@ -96,8 +96,6 @@ public class GetOptimizedThresholdCommand implements Command, Cancelable {
             cancel("Error while running optimizer.");
             e.printStackTrace();
         }
-
-        // get threshold and communicate it back to user
     }
 
     private void loadData(File validationRawData, File validationLabelingData) throws IOException {
