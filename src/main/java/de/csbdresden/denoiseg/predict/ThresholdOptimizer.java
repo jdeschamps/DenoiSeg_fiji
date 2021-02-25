@@ -54,9 +54,7 @@ public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
         this.data = data;
     }
 
-    public double run() throws Exception {
-        logService.log(0, "Starting threshold optimization");
-
+    public Map<Double, Double> run() throws Exception {
         // create prediction
         DenoiSegPrediction prediction;
         if (archive.getSpecification().getFormatVersion().compareTo("0.3.0") < 0) {
@@ -69,18 +67,19 @@ public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
         prediction.setOptions(this.createOptions());
 
         int n = data.size();
-        Map<Double, Double> scores = new HashMap<Double, Double>();
+        Map<Double, Double> scores = new LinkedHashMap<Double, Double>();
         for (int im=0; im<n; im++) {
-            for (double th = 0.1; th <= 1.; th += 0.1) {
-                // GT
-                final RandomAccessibleInterval<IntType> gt = data.get(im).getB();
+            // GT
+            final RandomAccessibleInterval<IntType> gt = data.get(im).getB();
 
-                // prediction
-                DenoiSegOutput<?, ?> output = singleImagePrediction(prediction, data.get(im).getA());
-                final RandomAccessibleInterval<FloatType> seg = (RandomAccessibleInterval<FloatType>) Views.hyperSlice(output.getSegmented(), 2, 1);
+            // prediction
+            DenoiSegOutput<?, ?> output = singleImagePrediction(prediction, data.get(im).getA());
+            final RandomAccessibleInterval<FloatType> seg = (RandomAccessibleInterval<FloatType>) Views.hyperSlice(output.getSegmented(), 2, 1);
 
+
+            for (int t = 0; t < 9; t++) {
                 // threshold foreground prediction to get a mask
-                final double threshold = th;
+                final double threshold = 0.1+0.1*t;
                 final RandomAccessibleInterval<BoolType> mask = Converters.convert(
                         seg, (i, o) -> o.set(i.get() > threshold), new BoolType());
 
@@ -107,29 +106,17 @@ public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
 
                 // get score
                 double score = getPrecision(gt, labelImg);
-                logService.log(0, "Image "+im+", Threshold "+th+" -> "+score);
+                //logService.log(0, "Image "+im+", Threshold "+th+" -> "+score);
 
-                if(scores.containsKey(th)){
-                    scores.put(th, scores.get(th)+score/ (double) n);
+                if(scores.containsKey(threshold)){
+                    scores.put(threshold, scores.get(threshold)+score/ (double) n);
                 } else {
-                    scores.put(th, score/ (double) n);
+                    scores.put(threshold, score/ (double) n);
                 }
             }
         }
 
-        double max_score = -1;
-        double threshold = -1;
-        for(Double t: scores.keySet()){
-            logService.log(0, "Threshold "+t+" -> "+scores.get(t));
-
-            if(scores.get(t) > max_score){
-                max_score = scores.get(t);
-                threshold = t;
-            }
-        }
-        logService.log(0, "Max threshold "+threshold+" -> "+max_score);
-
-        return threshold;
+        return scores;
     }
 
     // Code adapted from https://github.com/CellTrackingChallenge

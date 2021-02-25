@@ -23,11 +23,17 @@ import org.scijava.command.Command;
 import org.scijava.io.IOService;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
+import org.scijava.table.DefaultGenericTable;
+import org.scijava.table.DoubleColumn;
+import org.scijava.table.Table;
+import org.scijava.ui.UIService;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import static org.scijava.widget.FileWidget.DIRECTORY_STYLE;
@@ -54,6 +60,9 @@ public class GetOptimizedThresholdCommand implements Command, Cancelable {
 
     @Parameter
     private OpService opService;
+
+    @Parameter
+    private UIService uiService;
 
     @Parameter
     private ModelZooService modelZooService;
@@ -91,7 +100,29 @@ public class GetOptimizedThresholdCommand implements Command, Cancelable {
         // run
         thresholdOptimizer = new ThresholdOptimizer(context, archive, data);
         try {
-            thresholdOptimizer.run();
+            Map<Double, Double> results = thresholdOptimizer.run();
+
+            if(results != null && !results.isEmpty()){
+
+                Table table = new DefaultGenericTable();
+                DoubleColumn threshColumn = new DoubleColumn();
+                DoubleColumn metricsColumn = new DoubleColumn();
+
+                for(Double th: results.keySet()){
+                    double threshold = ((int) (th*100))/100.;
+                    threshColumn.add(threshold);
+                    metricsColumn.add(results.get(th));
+                }
+
+                table.add(threshColumn);
+                table.add(metricsColumn);
+
+                table.setColumnHeader(0, "Threshold");
+                table.setColumnHeader(1, "Metrics");
+
+                uiService.show("Segmentation results", table);
+            }
+
         } catch (Exception e) {
             cancel("Error while running optimizer.");
             e.printStackTrace();
