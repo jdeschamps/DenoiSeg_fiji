@@ -170,7 +170,7 @@ public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
             for (int j=0; j < numPredLabels; j++){
 
                 double overlap = (double) pairingMatrix[i + numGtLabels * j];
-                if(overlap > max_overlap){
+                if(overlap > max_overlap && overlap > 0){
                     max_overlap = overlap;
                     matchingLabel = j;
                 }
