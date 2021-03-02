@@ -163,7 +163,6 @@ public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
         }
 
         // for every gt label, find the pred label with maximum overlap
-        double num_labels = 0.;
         for (int i=0; i < numGtLabels; i++) {
             int matchingLabel = -1;
             double max_overlap = -1;
@@ -178,7 +177,6 @@ public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
             }
 
             if (matchingLabel >= 0) {
-                num_labels += 1;
                 double intersection = (double) pairingMatrix[i + numGtLabels * matchingLabel];
                 double n_gt = gtHist.get(gtLabels.get(i));
                 double n_pred = predHist.get(predLabels.get(matchingLabel));
@@ -187,7 +185,7 @@ public class ThresholdOptimizer<T extends RealType<T> & NativeType<T>> {
             }
         }
 
-        return num_labels == 0 ? 0 : precision / (double) num_labels;
+        return precision / (double) numGtLabels;
     }
 
 
