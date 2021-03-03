@@ -1,6 +1,7 @@
 package de.csbdresden.denoiseg.command;
 
 import de.csbdresden.denoiseg.predict.DenoiSegOutput;
+import de.csbdresden.denoiseg.predict.DenoiSegPostProcessor;
 import de.csbdresden.denoiseg.predict.DenoiSegPrediction;
 import de.csbdresden.denoiseg.predict.DeprecatedDenoiSegPrediction;
 import net.imagej.Dataset;
@@ -71,38 +72,17 @@ public class DenoiSegPredictProcessCommand <T extends RealType<T> & NativeType<T
     public void run() {
         super.run();
 
-        int[] dims = Intervals.dimensionsAsIntArray(segmented);
-        int dimToFix = 0;
-        for(int i=0; i<dims.length; i++){
-            if(dims[i] == 3) dimToFix = i;
+        if(segmented != null) {
+            int[] dims = Intervals.dimensionsAsIntArray(segmented);
+            int dimToFix = 0;
+            for (int i = 0; i < dims.length; i++) {
+                if (dims[i] == 3) dimToFix = i;
+            }
+            final RandomAccessibleInterval<FloatType> seg = (RandomAccessibleInterval<FloatType>) Views.hyperSlice(segmented.getImgPlus(), dimToFix, 1);
+
+            final Img<IntType> labelImg = DenoiSegPostProcessor.process(seg, threshold);
+            processed = datasetService.create(labelImg);
         }
-        final RandomAccessibleInterval<FloatType> seg = (RandomAccessibleInterval<FloatType>) Views.hyperSlice(segmented.getImgPlus(), dimToFix, 1);
-
-        final RandomAccessibleInterval<BoolType> mask = Converters.convert(
-                seg, (i, o) -> o.set(i.get() > threshold), new BoolType());
-
-        // create a String labeling
-        final Img<IntType> labelImg = ArrayImgs.ints(Intervals.dimensionsAsLongArray(seg));
-        final ImgLabeling<String, IntType> labeling = new ImgLabeling<>(labelImg);
-
-        // label connected components
-        final ConnectedComponents.StructuringElement se = ConnectedComponents.StructuringElement.FOUR_CONNECTED;
-        final Iterator<String> labelCreator = new Iterator<String>() {
-            int id = 0;
-
-            @Override
-            public boolean hasNext() {
-                return true;
-            }
-
-            @Override
-            public synchronized String next() {
-                return "l" + (id++);
-            }
-        };
-        ConnectedComponents.labelAllConnectedComponents(mask, labeling, labelCreator, se);
-
-        processed = datasetService.create(labelImg);
     }
 
     public static String getOutputSegmentedName() {
