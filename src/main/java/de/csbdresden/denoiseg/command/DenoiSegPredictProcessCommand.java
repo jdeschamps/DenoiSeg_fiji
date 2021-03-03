@@ -71,7 +71,12 @@ public class DenoiSegPredictProcessCommand <T extends RealType<T> & NativeType<T
     public void run() {
         super.run();
 
-        final RandomAccessibleInterval<FloatType> seg = (RandomAccessibleInterval<FloatType>) Views.hyperSlice(segmented.getImgPlus(), 2, 1);
+        int[] dims = Intervals.dimensionsAsIntArray(segmented);
+        int dimToFix = 0;
+        for(int i=0; i<dims.length; i++){
+            if(dims[i] == 3) dimToFix = i;
+        }
+        final RandomAccessibleInterval<FloatType> seg = (RandomAccessibleInterval<FloatType>) Views.hyperSlice(segmented.getImgPlus(), dimToFix, 1);
 
         final RandomAccessibleInterval<BoolType> mask = Converters.convert(
                 seg, (i, o) -> o.set(i.get() > threshold), new BoolType());
