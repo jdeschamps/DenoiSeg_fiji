@@ -194,9 +194,9 @@ public class DenoiSegOptimizeThresholdCommand implements Command, Cancelable {
         final ImageJ imageJ = new ImageJ();
         imageJ.ui().showUI();
 
-        File valX = new File("denoiseg_mouse/X_val");
-        File valY = new File("denoiseg_mouse/Y_val");
-        File model = new File("/denoiseg_mouse/denoiseg-5359585749979253915.bioimage.io.zip");
+        File valX = new File("/Users/deschamp/Downloads/denoiseg_mouse/X_val");
+        File valY = new File("/Users/deschamp/Downloads/denoiseg_mouse/Y_val");
+        File model = new File("/Users/deschamp/Downloads/denoiseg_mouse/denoiseg-5359585749979253915.bioimage.io.zip");
 
         imageJ.command().run( DenoiSegOptimizeThresholdCommand.class, true,
                 "modelFile", model,

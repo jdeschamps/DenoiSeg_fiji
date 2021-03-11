@@ -15,7 +15,7 @@ import java.util.Iterator;
 
 public class DenoiSegPostProcessor {
 
-    public static Img<IntType> process(RandomAccessibleInterval<FloatType> seg, double threshold){
+    public static ImgLabeling<String, IntType> process(RandomAccessibleInterval<FloatType> seg, double threshold){
         final RandomAccessibleInterval<BoolType> mask = Converters.convert(
                 seg, (i, o) -> o.set(i.get() > threshold), new BoolType());
 
@@ -40,6 +40,6 @@ public class DenoiSegPostProcessor {
         };
         ConnectedComponents.labelAllConnectedComponents(mask, labeling, labelCreator, se);
 
-        return labelImg;
+        return labeling;
     }
 }

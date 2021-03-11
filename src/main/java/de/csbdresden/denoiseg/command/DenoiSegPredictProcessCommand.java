@@ -6,15 +6,10 @@ import de.csbdresden.denoiseg.predict.DenoiSegPrediction;
 import de.csbdresden.denoiseg.predict.DeprecatedDenoiSegPrediction;
 import net.imagej.Dataset;
 import net.imagej.DatasetService;
+import net.imagej.ImageJ;
 import net.imagej.modelzoo.consumer.command.AbstractSingleImagePredictionCommand;
 import net.imglib2.RandomAccessibleInterval;
-import net.imglib2.algorithm.labeling.ConnectedComponents;
-import net.imglib2.converter.Converters;
-import net.imglib2.img.Img;
-import net.imglib2.img.array.ArrayImgs;
-import net.imglib2.roi.labeling.ImgLabeling;
 import net.imglib2.type.NativeType;
-import net.imglib2.type.logic.BoolType;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
@@ -25,8 +20,9 @@ import org.scijava.command.Command;
 import org.scijava.plugin.Parameter;
 import org.scijava.plugin.Plugin;
 
+import java.io.File;
 import java.io.IOException;
-import java.util.Iterator;
+import java.util.concurrent.ExecutionException;
 
 @Plugin( type = Command.class, menuPath = "Plugins>CSBDeep>DenoiSeg>DenoiSeg predict + post-process" )
 public class DenoiSegPredictProcessCommand <T extends RealType<T> & NativeType<T>> extends AbstractSingleImagePredictionCommand<T, DenoiSegPrediction> {
@@ -80,7 +76,7 @@ public class DenoiSegPredictProcessCommand <T extends RealType<T> & NativeType<T
             }
             final RandomAccessibleInterval<FloatType> seg = (RandomAccessibleInterval<FloatType>) Views.hyperSlice(segmented.getImgPlus(), dimToFix, 1);
 
-            final Img<IntType> labelImg = DenoiSegPostProcessor.process(seg, threshold);
+            final RandomAccessibleInterval<IntType> labelImg = DenoiSegPostProcessor.process(seg, threshold).getIndexImg();
             processed = datasetService.create(labelImg);
         }
     }
