@@ -1,4 +1,4 @@
-package de.csbdresden.denoiseg.predict;
+package de.csbdresden.denoiseg.threshold;
 
 import de.csbdresden.denoiseg.threshold.ThresholdOptimizer;
 import net.imglib2.Cursor;
