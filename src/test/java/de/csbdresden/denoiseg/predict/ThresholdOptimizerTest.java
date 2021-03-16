@@ -1,5 +1,6 @@
 package de.csbdresden.denoiseg.predict;
 
+import de.csbdresden.denoiseg.threshold.ThresholdOptimizer;
 import net.imglib2.Cursor;
 import net.imglib2.img.Img;
 import net.imglib2.img.array.ArrayImgs;

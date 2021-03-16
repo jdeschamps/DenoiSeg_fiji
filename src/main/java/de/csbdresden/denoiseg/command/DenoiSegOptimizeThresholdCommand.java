@@ -1,6 +1,6 @@
 package de.csbdresden.denoiseg.command;
 
-import de.csbdresden.denoiseg.predict.ThresholdOptimizer;
+import de.csbdresden.denoiseg.threshold.ThresholdOptimizer;
 import net.imagej.ImageJ;
 import net.imagej.modelzoo.ModelZooArchive;
 import net.imagej.modelzoo.ModelZooService;
@@ -14,6 +14,7 @@ import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.IntType;
 import net.imglib2.type.numeric.real.FloatType;
 import net.imglib2.util.Pair;
+import net.imglib2.util.ValuePair;
 import net.imglib2.view.Views;
 import org.scijava.Cancelable;
 import org.scijava.Context;
@@ -133,7 +134,7 @@ public class DenoiSegOptimizeThresholdCommand implements Command, Cancelable {
             Img image = (Img) ioService.open(file.getAbsolutePath());
             RandomAccessibleInterval<IntType> labeling = getLabeling(file, validationLabelingData);
             RandomAccessibleInterval<FloatType> imageFloat = convertToFloat(image);
-            data.add(new ValidationPair(imageFloat, labeling));
+            data.add(new ValuePair(imageFloat, labeling));
         }
 
     }
@@ -202,26 +203,5 @@ public class DenoiSegOptimizeThresholdCommand implements Command, Cancelable {
                 "modelFile", model,
                 "validationRawData", valX,
                 "validationLabelingData", valY).get();
-    }
-
-    class ValidationPair implements Pair<RandomAccessibleInterval<FloatType>, RandomAccessibleInterval<IntType>>{
-
-        private RandomAccessibleInterval<FloatType> image;
-        private RandomAccessibleInterval<IntType> label;
-
-        public ValidationPair(RandomAccessibleInterval<FloatType> image, RandomAccessibleInterval<IntType> label){
-            this.image = image;
-            this.label = label;
-        }
-
-        @Override
-        public RandomAccessibleInterval<FloatType> getA() {
-            return image;
-        }
-
-        @Override
-        public RandomAccessibleInterval<IntType> getB() {
-            return label;
-        }
     }
 }

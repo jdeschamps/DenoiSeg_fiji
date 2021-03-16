@@ -1,6 +1,9 @@
-package de.csbdresden.denoiseg.predict;
+package de.csbdresden.denoiseg.threshold;
 
 
+import de.csbdresden.denoiseg.predict.DenoiSegOutput;
+import de.csbdresden.denoiseg.predict.DenoiSegPrediction;
+import de.csbdresden.denoiseg.predict.DeprecatedDenoiSegPrediction;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
